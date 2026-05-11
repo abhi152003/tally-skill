@@ -1,7 +1,7 @@
 ---
 emoji: 🧾
 name: tally-prime-ca
-version: 1.0.6
+version: 1.0.7
 author: Maxxit
 description: >-
   Full-service CA skill for TallyPrime running locally. Read accounting reports
@@ -18,6 +18,7 @@ metadata:
   openclaw:
     requiredEnv:
       - TALLY_URL
+    optionalEnv:
     bins:
       - curl
     primaryCredential: TALLY_URL
@@ -51,17 +52,18 @@ Use when the user asks to:
 ## Critical rules (must follow)
 
 1. **Never assume company**: if not explicit, ask which company to use before posting.
-2. **Never guess ledgers**: verify ledgers exist before voucher import; create missing masters first.
-3. **Dates are `YYYYMMDD`** (no separators).
-4. **Idempotency**: always set a stable unique `GUID` per voucher to prevent duplicates on retries.
-5. **Balance vouchers**: total debits must equal total credits (Tally error: “Voucher totals do not match!”).
-6. **Escape XML**: narration/party names may contain `&` → use `&amp;` in XML.
-7. **Posting is write operation**: confirm intent (and company) before any create/alter/cancel.
-8. **Prefer bill-wise allocations** for party ledgers to keep outstandings correct (see `reference/vouchers.md`).
-9. **Accounting-only vouchers (no inventory items)**: set `<ISINVOICE>No</ISINVOICE>` and place the **party ledger entry first** in the `ALLLEDGERENTRIES.LIST` sequence. This makes the Day Book "Particulars" column show the party name (not the expense/purchase ledger) and defaults the voucher to the clean "As Voucher" view. Only use `ISINVOICE=Yes` for item invoices that go through `reference/inventory.md`.
-10. **Accounting Invoice Mode — always use `LEDGERENTRIES.LIST`**: when `OBJVIEW="Invoice Voucher View"` is set (Modes 1 and 2 in `reference/vouchers.md`), every ledger block **must** use `<LEDGERENTRIES.LIST>`, not `<ALLLEDGERENTRIES.LIST>`. Tally silently ignores `ALLLEDGERENTRIES` in this view, causing the voucher to be saved with no entries and the error "No accounting or inventory entries are available."
-11. **Voucher class decision — confirm before posting**: before posting any Purchase or Sales voucher, check whether the company's voucher type uses a class for GST splitting. Run the preflight checklist in the "Preflight checklist before posting" section below. If class mode is confirmed, set `<CLASSNAME>EXACT_CLASS_NAME</CLASSNAME>` in the voucher header and include all four GST header fields (`CMPGSTIN`, `PARTYGSTIN`, `GSTREGISTRATIONTYPE`, `PLACEOFSUPPLY`). **If class existence is unconfirmed, stop and ask — do not post without it.** Full decision rules and templates are in the "Voucher class — decision rules" section of `reference/vouchers.md`.
-
+2. **Company profile first**: before working on any company, check for a matching profile in `company-profiles/` using company name + Tally GUID when available. Follow `reference/company-profiles.md`.
+3. **Never guess ledgers**: verify ledgers exist before voucher import; create missing masters first.
+4. **Dates are `YYYYMMDD`** (no separators).
+5. **Idempotency**: always set a stable unique `GUID` per voucher to prevent duplicates on retries.
+6. **Balance vouchers**: total debits must equal total credits (Tally error: “Voucher totals do not match!”).
+7. **Escape XML**: narration/party names may contain `&` → use `&amp;` in XML.
+8. **Posting is write operation**: confirm intent (and company) before any create/alter/cancel, except when the CA has already approved the same company + voucher pattern in the current session.
+9. **Prefer bill-wise allocations** for party ledgers to keep outstandings correct (see `reference/vouchers.md`).
+10. **Accounting-only vouchers (no inventory items)**: set `<ISINVOICE>No</ISINVOICE>` and place the **party ledger entry first** in the `ALLLEDGERENTRIES.LIST` sequence. This makes the Day Book "Particulars" column show the party name (not the expense/purchase ledger) and defaults the voucher to the clean "As Voucher" view. Only use `ISINVOICE=Yes` for item invoices that go through `reference/inventory.md`.
+11. **Accounting Invoice Mode — always use `LEDGERENTRIES.LIST`**: when `OBJVIEW="Invoice Voucher View"` is set (Modes 1 and 2 in `reference/vouchers.md`), every ledger block **must** use `<LEDGERENTRIES.LIST>`, not `<ALLLEDGERENTRIES.LIST>`. Tally silently ignores `ALLLEDGERENTRIES` in this view, causing the voucher to be saved with no entries and the error "No accounting or inventory entries are available."
+12. **Voucher class decision — confirm before posting**: before posting any Purchase or Sales voucher, check whether the company's voucher type uses a class for GST splitting. Run the preflight checklist in the "Preflight checklist before posting" section below. If class mode is confirmed, set `<CLASSNAME>EXACT_CLASS_NAME</CLASSNAME>` in the voucher header and include all four GST header fields (`CMPGSTIN`, `PARTYGSTIN`, `GSTREGISTRATIONTYPE`, `PLACEOFSUPPLY`). **If class existence is unconfirmed, stop and ask — do not post without it.** Full decision rules and templates are in the "Voucher class — decision rules" section of `reference/vouchers.md`.
+13. **Company GSTIN is optional at creation**: TallyPrime company creation does not require GSTIN. Do not block new company creation for missing GSTIN. Ask for GSTIN only if CA wants GST configured now, and otherwise capture/validate it later when GST vouchers or GST reports are needed.
 ## Preflight checklist before posting
 
 Run through every item before sending any Create/Alter/Delete request. **Stop at the first unresolved item and ask the user.**
@@ -70,12 +72,15 @@ Run through every item before sending any Create/Alter/Delete request. **Stop at
 |---|---|---|---|
 | 1 | **Company confirmed** | User stated it explicitly | Name not given — ask |
 | 2 | **Server reachable** | `curl -s --max-time 5 "$TALLY_URL"` | No response / wrong port |
-| 3 | **Voucher type uses a class?** | Export voucher type masters or ask user | Unknown — ask before posting |
-| 4 | **Class name confirmed** (if class mode) | List voucher type via masters export; match exact class name in Tally | Class not found — ask, never guess |
-| 5 | **Party ledger exists** | Ledger existence check (`reference/masters.md`) | Missing — create first |
-| 6 | **Purchase/Sales/GST ledgers exist** | Same as above | Missing — create first |
-| 7 | **GST header fields available** (if class mode) | `CMPGSTIN`, `PARTYGSTIN`, `GSTREGISTRATIONTYPE`, `PLACEOFSUPPLY` | Any missing — ask user |
-| 8 | **Voucher totals balance** | Sum all `AMOUNT` values = 0 | Mismatch — fix before posting |
+| 3 | **Company profile loaded** | Match `company-profiles/*.md` by company name + Tally GUID where available | Missing profile — follow `reference/company-profiles.md` to create/approve one or continue only after CA direction |
+| 4 | **Pattern selected** | Match the request to a profile voucher pattern/default/exception | Unknown or conflicting — ask CA |
+| 5 | **Referenced masters validated once this session** | Check ledgers/voucher types/classes used by the selected pattern | Missing/renamed — ask CA |
+| 6 | **Voucher type uses a class?** | Prefer profile, then export voucher type masters or ask user | Unknown — ask before posting |
+| 7 | **Class name confirmed** (if class mode) | List voucher type via masters export; match exact class name in Tally | Class not found — ask, never guess |
+| 8 | **Party ledger exists** | Ledger existence check (`reference/masters.md`) | Missing — create first |
+| 9 | **Purchase/Sales/GST ledgers exist** | Same as above | Missing — create first |
+| 10 | **GST header fields available** (if class mode) | `CMPGSTIN`, `PARTYGSTIN`, `GSTREGISTRATIONTYPE`, `PLACEOFSUPPLY` | Any missing — ask user |
+| 11 | **Voucher totals balance** | Sum all `AMOUNT` values = 0 | Mismatch — fix before posting |
 
 ## Step 0: Check TallyPrime server
 
@@ -97,11 +102,26 @@ If the user did not specify company, ask. If they did, use **exact** name in `SV
 
 To list companies, use the template in `reference/reports.md` (“Company list”).
 
+## Step 1A: Company profile context
+
+Before creating, altering, or importing vouchers for a company:
+
+1. Look for a matching profile in `company-profiles/`.
+2. Match by exact company name and Tally GUID where available.
+3. If multiple profiles match, ask the CA to choose.
+4. If no profile exists:
+   - For an existing company with prior vouchers, infer a draft from recent vouchers + masters and ask CA approval before saving.
+   - For a new company, ask targeted setup questions or copy an existing company profile as inherited reference if CA requests it. GSTIN is optional during this step.
+5. Use the profile as the company-specific source of intent for voucher patterns.
+6. Validate only the masters referenced by the selected pattern, and only once per session.
+
+See `reference/company-profiles.md` for the full workflow, schema, and template.
+
 ## Step 2: Verify/create required ledgers (masters)
 
 Ledger existence checks and master creation templates are in `reference/masters.md` (includes ledgers, groups, GST/address fields, and party ledger creation with required field prompts).
 
-**New company?** Run the "New Company Setup — Standard GST Ledgers" block in `reference/masters.md` first. It creates the seven minimum ledgers every GST-registered company needs:
+**New GST-registered company?** If the CA wants GST setup now, run the "New Company Setup — Standard GST Ledgers" block in `reference/masters.md`. GSTIN is not mandatory for base company creation; ask for it only if the CA wants GST registration/configuration captured now or if GST vouchers will be posted.
 
 | # | Ledger | Type |
 |---|---|---|
@@ -189,3 +209,4 @@ When importing bank statement transactions (PDF/Excel from bank), use the mappin
 - Masters (ledgers/groups + GST/address, alteration): `reference/masters.md`
 - Inventory (stock groups/items/UOM, item invoices): `reference/inventory.md`
 - Error handling and troubleshooting: `reference/errors.md`
+- Per-company voucher behavior profiles: `reference/company-profiles.md`

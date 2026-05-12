@@ -1,7 +1,7 @@
 ---
 emoji: 🧾
 name: tally-prime-ca
-version: 1.0.6
+version: 1.0.7
 author: Maxxit
 description: >-
   Full-service CA skill for TallyPrime running locally. Read accounting reports
@@ -47,6 +47,10 @@ Use when the user asks to:
 - Check reports: day book, trial balance, balance sheet, profit & loss, ledger statement, outstandings, GST
 - Manage masters: create/alter ledgers, groups, stock items/UOM (inventory clients)
 - Fix data: alter or cancel a voucher
+
+For any Tally/accounting task, **always follow this skill and its `reference/` templates**. Do not create XML payloads from scratch for known flows; use the documented template that matches the task and only replace the required placeholders. If the required task is not documented, first read `SKILL.md` and all relevant files in `reference/` thoroughly; if no documented template/workflow exists, clearly tell the user that this skill cannot perform that task yet and do not attempt it.
+
+Responses to users must be written for accountants, not developers. After Tally calls, do **not** mention XML, payloads, HTTP, server responses, status codes, raw API output, or integration internals unless the user explicitly asks for technical details. Say “Tally is connected” instead of “server is running”; say “Entry posted” or “Entry updated” instead of “XML import succeeded”; then summarize the company name, voucher type, date, party/ledger names, amount, tax split, narration, and any masters created or missing.
 
 ## Critical rules (must follow)
 
@@ -147,6 +151,7 @@ Common CA reports:
 - Trial Balance (period)
 - Balance Sheet
 - Profit and Loss
+- Ledger Names — fetch all ledger names before mapping/posting entries
 - Ledger Vouchers (ledger statement)
 - Bills Receivable / Bills Payable (outstandings)
 - Ledger Outstandings / Group Outstandings
@@ -180,6 +185,7 @@ When importing bank statement transactions (PDF/Excel from bank), use the mappin
 
 - Mapping bank entries to Receipt/Payment/Contra vouchers
 - Ledger selection rules (debits, credits, expenses)
+- Before posting, fetch all ledger names using `reference/reports.md` → "Ledger Names (all ledgers)" and confirm once with the user: “These are the ledgers I will use for the bank entries: ...”. Do not post until the user confirms the ledger mapping.
 - Full XML templates for common bank transactions (NEFT, RTGS, UPI, charges)
 
 ## Advanced reference

@@ -203,6 +203,52 @@ Mandatory var: `SVLEDGERNAME`, plus dates.
 </ENVELOPE>
 ```
 
+## Ledger Names (all ledgers)
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Data</TYPE>
+    <ID>LedgerListReport</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>COMPANY_NAME</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <REPORT NAME="LedgerListReport">
+            <FORMS>LedgerListForm</FORMS>
+          </REPORT>
+          <FORM NAME="LedgerListForm">
+            <PARTS>LedgerListPart</PARTS>
+          </FORM>
+          <PART NAME="LedgerListPart">
+            <LINES>LedgerListLine</LINES>
+            <REPEAT>LedgerListLine : LedgerCollection</REPEAT>
+            <SCROLL>Vertical</SCROLL>
+          </PART>
+          <LINE NAME="LedgerListLine">
+            <FIELDS>LedgerNameField</FIELDS>
+          </LINE>
+          <FIELD NAME="LedgerNameField">
+            <SET>$Name</SET>
+          </FIELD>
+          <COLLECTION NAME="LedgerCollection">
+            <TYPE>Ledger</TYPE>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>
+```
+
 ## Bills Receivable (Outstanding receivables)
 
 ```xml

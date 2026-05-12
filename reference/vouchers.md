@@ -916,15 +916,32 @@ For itemized invoices using `ALLINVENTORYENTRIES.LIST` and `ACCOUNTINGALLOCATION
 
 When importing transactions from a bank statement, map each bank entry to the appropriate voucher type:
 
+### Bank statement debit/credit rule
+
+Bank statements show entries from the **bank's perspective**, but Tally entries must be posted from the **business's books**:
+
+| Bank statement entry | Meaning in business books | Tally posting |
+|----------------------|---------------------------|---------------|
+| Bank statement **Credit** | Money received into bank | **Debit** the bank ledger |
+| Bank statement **Debit** | Money paid out of bank | **Credit** the bank ledger |
+
+For contra vouchers, debit the account that receives funds and credit the account that gives funds:
+
+| Contra transaction | Debit | Credit |
+|--------------------|-------|--------|
+| Cash deposited into bank | Bank | Cash |
+| Cash withdrawn from bank / ATM withdrawal | Cash | Bank |
+| Bank A to Bank B transfer | Destination Bank | Source Bank |
+
 ### Mapping Rules
 
 | Bank Entry | Voucher Type | Debit Ledger | Credit Ledger |
 |------------|--------------|--------------|---------------|
 | Deposit / NEFT Credit / RTGS Credit / UPI Credit | **Receipt** | Bank/Cash | Customer/Party ledger (Sundry Debtors) |
 | Withdrawal / NEFT Debit / RTGS Debit / UPI Debit / Cheque Issued | **Payment** | Supplier/Expense ledger | Bank/Cash |
-| ATM Withdrawal | **Contra** | Bank (withdrawal from) | Cash (deposit to) |
-| Cash Deposit | **Contra** | Cash (withdrawal from) | Bank (deposit to) |
-| Bank-to-Bank Transfer | **Contra** | Source Bank | Destination Bank |
+| ATM Withdrawal | **Contra** | Cash | Bank |
+| Cash Deposit | **Contra** | Bank | Cash |
+| Bank-to-Bank Transfer | **Contra** | Destination Bank | Source Bank |
 | Interest Credit | **Receipt** | Bank | Interest Income ledger |
 | Bank Charges | **Payment** | Bank Charges ledger | Bank |
 | GST/TDS Payment | **Payment** | GST/TDS Duty ledger | Bank |
@@ -936,9 +953,8 @@ Before importing bank statement transactions:
 1. **Verify bank ledger exists** in Tally (create if missing)
 2. **Verify cash ledger exists** if importing ATM/deposit transactions
 3. **Verify party ledgers exist** — create unknown parties from statement first
-4. **Check voucher class configuration** — most bank vouchers don't use GST classes
-5. **Date format** — convert statement dates to `YYYYMMDD`
-6. **GUID pattern** — use `bankstmt-{bankAcct}-{date}-{seq}` for idempotency
+4. **Fetch ledger names** — use `reference/reports.md` → "Ledger Names (all ledgers)" before mapping statement rows
+5. **Confirm ledger mapping once** — tell the user “These are the ledgers I will use for the bank entries: ...”
 
 ### Example: NEFT Credit (Receipt)
 

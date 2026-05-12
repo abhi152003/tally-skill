@@ -1,7 +1,7 @@
 ---
 emoji: 🧾
 name: tally-prime-ca
-version: 1.0.7
+version: 1.0.8
 author: Maxxit
 description: >-
   Full-service CA skill for TallyPrime running locally. Read accounting reports
@@ -20,6 +20,7 @@ metadata:
       - TALLY_URL
     bins:
       - curl
+      - tallyca
     primaryCredential: TALLY_URL
 ---
 
@@ -39,10 +40,84 @@ Goal: zero manual entry for CAs handling many clients.
 3. Post voucher with a **unique GUID**.
 4. Confirm a summary back to the user.
 
+## PDF Generation from Text (Invoice / Receipt)
+
+When the user asks to **generate a PDF** from invoice data or any text message, use the `tallyca` CLI. This converts raw WhatsApp/Telegram text directly into a professional GST-compliant PDF
+
+### One-time setup (run once per environment)
+
+```bash
+npm install -g tallyca
+```
+
+### Generate invoice PDF from raw WhatsApp text
+
+Pass the user's message directly to `tallyca from-text`:
+
+```bash
+tallyca from-text \
+  --company "ABC Company" \
+  --text "Party Name: XYZ Party
+Invoice No.: 186
+Date: 2/1/2026
+Item: PQR Item 2523 @ 18 %
+Qty: 140 Bag
+Rate: 279.66/Bag
+HSN Code: 25322210
+Amount: 39152.40
+Make sure to use voucher class Sales @ 18 %" \
+  --output invoice_186.pdf
+```
+
+The parser auto-extracts: party name, invoice number, date, item details, HSN, quantity, rate, tax rate, amount, and voucher class.
+
+### Generate invoice PDF with structured flags
+
+When you have already extracted the fields:
+
+```bash
+tallyca generate:invoice \
+  --company "ABC Company" \
+  --party "XYZ Party" \
+  --invoice-no 186 \
+  --date "2/1/2026" \
+  --item "PQR Item|140 Bag|279.66|18%|25322210" \
+  --voucher-class "Sales @ 18 %" \
+  --output invoice_186.pdf
+```
+
+Item format: `Description|Qty Unit|Rate|Tax%|HSN` (pipe-separated). Use `--item` multiple times for multiple line items.
+
+### Generate generic PDF (receipts, notes)
+
+```bash
+tallyca generate:generic \
+  --title "Payment Receipt" \
+  --body "Payment of ₹39152.40 received from XYZ Party against Invoice 186." \
+  --output receipt.pdf
+```
+
+### Commands summary
+
+| Command | Use case |
+|---|---|
+| `tallyca from-text --text "..." --output x.pdf` | Auto-detect type from raw text |
+| `tallyca generate:invoice --party "..." --item "..." --output x.pdf` | Structured invoice data |
+| `tallyca generate:generic --title "..." --body "..." --output x.pdf` | Receipts, notes, any text |
+
+### Workflow: User asks for PDF
+
+1. User sends invoice details via WhatsApp/Telegram
+2. Check if `tallyca` is installed: `which tallyca` or `tallyca --version`
+3. If not installed: `npm install -g tallyca`
+4. Run `tallyca from-text` with the user's message as `--text`
+5. Return the generated PDF file to the user
+
 ## When to use this skill
 
 Use when the user asks to:
 
+- **Generate PDF**: create invoice PDF, receipt PDF, or any document from text/data (use `tallyca` CLI)
 - Post entries: purchase, sales, receipt, payment, journal, contra, credit note, debit note
 - Check reports: day book, trial balance, balance sheet, profit & loss, ledger statement, outstandings, GST
 - Manage masters: create/alter ledgers, groups, stock items/UOM (inventory clients)

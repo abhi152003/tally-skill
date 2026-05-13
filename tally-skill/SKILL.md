@@ -1,7 +1,7 @@
 ---
 emoji: 🧾
 name: tally-prime-ca
-version: 1.0.8
+version: 1.0.9
 author: Maxxit
 description: >-
   Full-service CA skill for TallyPrime running locally. Read accounting reports
@@ -42,12 +42,85 @@ Goal: zero manual entry for CAs handling many clients.
 
 ## PDF Generation from Text (Invoice / Receipt)
 
-When the user asks to **generate a PDF** from invoice data or any text message, use the `tallyca` CLI. This converts raw WhatsApp/Telegram text directly into a professional GST-compliant PDF
+When the user asks to **generate a PDF** from invoice data or any text message, use the `tallyca` CLI. This converts raw WhatsApp/Telegram text directly into a professional GST-compliant PDF.
+
+**Important:** Always produce the file **only** via `tallyca`. Do **not** invent HTML/PDF with the model when `tallyca` fails — fix the environment (below) or set `TALLYCA_PDF_BACKEND=pdfmake` and retry.
 
 ### One-time setup (run once per environment)
 
 ```bash
 npm install -g tallyca
+```
+
+### Minimum `tallyca` CLI version (OpenClaw must stay current)
+
+OpenClaw **does not** auto-discover new npm releases. Whatever was installed with `npm install -g tallyca` stays until someone runs an upgrade command.
+
+**Required for this skill’s PDF flows:** `tallyca` **>= 1.0.1** (semver). Features such as Playwright + pdfmake fallback and `TALLYCA_PDF_BACKEND` assume this baseline.
+
+When you publish a newer **breaking** or **must-have** CLI release, **edit this line** in `SKILL.md` to the new minimum and redeploy the skill so agents reinstall if needed.
+
+**Preflight (before generating a PDF):**
+
+1. Run `tallyca --version` (output looks like `tallyca/1.0.1 …`). Compare the numeric version to the minimum above.
+2. If `tallyca` is missing or older than the minimum, run:
+
+   ```bash
+   npm install -g tallyca@latest
+   ```
+
+   Or pin exactly: `npm install -g tallyca@1.0.1`.
+
+3. **Optional** (only if npm registry is reachable): compare registry vs installed:
+
+   ```bash
+   npm view tallyca version
+   ```
+
+   If the registry version is newer **and** you want the latest fixes, run `npm install -g tallyca@latest`, then re-check `tallyca --version`.
+
+**Note:** The `version:` field at the top of this file is the **skill document** version, not the `tallyca` package version.
+
+### PDF rendering on servers (AWS / Linux / minimal images)
+
+`tallyca` tries **Playwright + Chromium** first (matches the HTML templates). If Chromium cannot start (common errors: missing `libatk-1.0.so.0`, “failed to launch browser”, missing GTK/GBM libs), it **automatically falls back** to **pdfmake** (pure JavaScript, no browser). You can control this with **`TALLYCA_PDF_BACKEND`**:
+
+| Value | Behavior |
+|-------|----------|
+| `auto` (default) | Playwright first; on typical Chromium failures, use pdfmake |
+| `playwright` | Playwright only — fails if Chromium/libs missing |
+| `pdfmake` | Skip Chromium — always pdfmake (best on locked-down serverless/AWS without apt/yum) |
+
+**Recommended on AWS when Playwright errors appear:**
+
+```bash
+export TALLYCA_PDF_BACKEND=pdfmake
+```
+
+Then run the same `tallyca from-text` / `generate:invoice` commands as usual.
+
+**If you can install OS packages** (full EC2/container with sudo), install Chromium dependencies and browsers so Playwright works:
+
+**Amazon Linux 2 / AL2023**
+
+```bash
+sudo yum install -y \
+  alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+  libXdamage libXrandr mesa-libgbm pango gtk3
+npx playwright install chromium
+npx playwright install-deps chromium
+```
+
+**Ubuntu / Debian**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+  libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+  libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0
+npx playwright install chromium
+npx playwright install-deps chromium
 ```
 
 ### Generate invoice PDF from raw WhatsApp text
@@ -108,10 +181,23 @@ tallyca generate:generic \
 ### Workflow: User asks for PDF
 
 1. User sends invoice details via WhatsApp/Telegram
-2. Check if `tallyca` is installed: `which tallyca` or `tallyca --version`
-3. If not installed: `npm install -g tallyca`
-4. Run `tallyca from-text` with the user's message as `--text`
-5. Return the generated PDF file to the user
+2. Check if `tallyca` is installed: `which tallyca` / `where tallyca` (Windows) or `tallyca --version`
+3. Run **`tallyca --version`** and confirm it meets **Minimum `tallyca` CLI version** above. If missing or too old: `npm install -g tallyca@latest` (or the pinned version), then verify again.
+4. **Optional:** Run `npm view tallyca version` if you need to confirm whether a newer CLI exists on npm before upgrading.
+5. Run `tallyca from-text` with the user's message as `--text` (and `--company` / `--output` as needed)
+6. If the command fails with Chromium/browser/library errors on Linux/AWS: set `TALLYCA_PDF_BACKEND=pdfmake` for that shell session (or install OS + Playwright deps above), then **retry the same `tallyca` command**. Do not substitute a hand-built PDF from the model.
+7. Return the generated PDF file from `tallyca` to the user
+
+### Maintainer / release discipline (`tallyca` npm package)
+
+When you ship a **new `tallyca` version** that this skill depends on (new flags, breaking PDF behavior, or required bugfixes):
+
+1. Publish **`tallyca`** to npm (`tally-pdf-cli` package).
+2. Update **Minimum `tallyca` CLI version** in this section if the skill requires that release (especially majors or breaking flags).
+3. Bump this **`SKILL.md` frontmatter `version`** when you redistribute the skill bundle so teams know the doc changed.
+
+That way OpenClaw instructions and the installed CLI stay aligned; the agent only “knows” about new versions through **this documented minimum + upgrade commands**, not automatically.
+
 
 ## When to use this skill
 
